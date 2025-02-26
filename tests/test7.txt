@@ -1,0 +1,7 @@
+PROCEDURE Main
+    DECLARE FileName : STRING
+    FileName ← "Grades.txt"
+    CALL InitializeArrays
+    CALL InputStudentData
+    CALL ProcessGrades(FileName)
+ENDPROCEDURE

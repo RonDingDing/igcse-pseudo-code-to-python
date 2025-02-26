@@ -1,0 +1,5 @@
+IF X > 5 THEN
+    OUTPUT "X is greater than 5"
+ELSE
+    OUTPUT "X is 5 or less"
+ENDIF

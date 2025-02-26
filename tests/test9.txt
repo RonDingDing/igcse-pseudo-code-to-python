@@ -1,0 +1,18 @@
+// 输入学生数据
+PROCEDURE InputStudentData
+    DECLARE TempName : STRING
+    DECLARE TempScore : REAL
+    
+    OUTPUT "Enter student data:"
+    FOR Index ← 1 TO 5
+        OUTPUT "Student ", Index, " name:"
+        INPUT TempName
+        StudentNames[Index] ← UCASE(TempName)
+        
+        REPEAT
+            OUTPUT "Score (0-100):"
+            INPUT TempScore
+        UNTIL TempScore >= 0 AND TempScore <= 100
+        StudentScores[Index] ← ROUND(TempScore, 1)
+    NEXT Index
+ENDPROCEDURE

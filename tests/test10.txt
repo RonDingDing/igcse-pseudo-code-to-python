@@ -1,0 +1,27 @@
+// 处理成绩并写入文件
+PROCEDURE ProcessGrades(FileName : STRING)
+    OPENFILE FileName FOR WRITE
+    DECLARE Grade : CHAR
+    
+    FOR Index ← 1 TO 5
+        // 嵌套条件判断
+        IF StudentScores[Index] >= PassMark
+            THEN
+            CASE OF MOD(Index, 3)
+                0 : Grade ← 'A'
+                1 : Grade ← 'B'
+                2 : Grade ← 'C'
+                OTHERWISE Grade ← 'X'
+            ENDCASE
+        ELSE
+            Grade ← 'F'
+        ENDIF
+        
+        // 嵌套字符串操作
+        DECLARE OutputLine : STRING
+        OutputLine ← SUBSTRING(StudentNames[Index], 1, 3) + ": " + StudentScores[Index] + " (" + Grade + ")"
+        WRITEFILE FileName, OutputLine
+    NEXT Index
+    
+    CLOSEFILE FileName
+ENDPROCEDURE

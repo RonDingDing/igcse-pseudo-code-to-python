@@ -1,0 +1,15 @@
+// 函数示例：计算统计信息
+FUNCTION CalculateAverage RETURNS REAL
+    DECLARE Total : REAL
+    Total ← 0.0
+    WHILE Total < 500.0 DO
+        FOR Index ← 1 TO 5
+            Total ← Total + StudentScores[Index]
+        NEXT Index
+        Total ← Total + RANDOM() * 10  // 添加随机波动
+    ENDWHILE
+    RETURN Total / (5 * DIV(25, 5))  // 使用DIV运算符
+ENDFUNCTION
+
+// 调用函数并输出结果
+OUTPUT "Average score: ", CalculateAverage()

@@ -1,0 +1,7 @@
+// 初始化数组
+PROCEDURE InitializeArrays
+    FOR Index ← 1 TO 5
+        StudentScores[Index] ← 0.0
+        StudentNames[Index] ← ""
+    NEXT Index
+ENDPROCEDURE

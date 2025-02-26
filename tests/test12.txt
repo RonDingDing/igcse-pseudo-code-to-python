@@ -1,0 +1,12 @@
+// 函数示例：计算统计信息
+FUNCTION ProcessGrades(a : INTEGER) RETURNS INTEGER
+    RETURN a / (5 * DIV(25, 5))  // 使用DIV运算符
+ENDFUNCTION
+
+FUNCTION Plus(a : INTEGER, b: INTEGER) RETURNS INTEGER
+    RETURN  a + b   
+ENDFUNCTION
+
+// 调用函数并输出结果
+OUTPUT "Average score: ", ProcessGrades()
+OUTPUT "Average score: ", Plus(4, 8)

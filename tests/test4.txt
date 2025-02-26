@@ -1,0 +1,8 @@
+DECLARE Size : INTEGER
+Size ← 10
+DECLARE Matrix : ARRAY[2+(Size+2)*2:2+(Size+2)*2, 1:(Size+2)*2] OF INTEGER
+IF Matrix[1, 2] > 100 THEN
+    OUTPUT "Large number"
+ELSE
+    OUTPUT "Normal"
+ENDIF
