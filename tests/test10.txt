@@ -7,11 +7,12 @@ PROCEDURE ProcessGrades(FileName : STRING)
         // 嵌套条件判断
         IF StudentScores[Index] >= PassMark
             THEN
+            Grade ← 'O'
             CASE OF MOD(Index, 3)
-                0 : Grade ← 'A'
-                1 : Grade ← 'B'
-                2 : Grade ← 'C'
-                OTHERWISE Grade ← 'X'
+               0 : Grade ← 'A'
+               1 : Grade ← 'B'
+               2 : Grade ← 'C'
+               OTHERWISE Grade ← 'X'
             ENDCASE
         ELSE
             Grade ← 'F'

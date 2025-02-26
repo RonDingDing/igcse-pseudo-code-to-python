@@ -1,3 +1,4 @@
+CONSTANT X ← 0
 IF X > 5 THEN
     OUTPUT "X is greater than 5"
 ELSE

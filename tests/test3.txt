@@ -1,3 +1,8 @@
 FOR Index ← 1 TO 10
     OUTPUT Index
 NEXT Index
+
+
+FOR Index ← 1 TO 10 STEP 3
+    OUTPUT Index
+NEXT Index

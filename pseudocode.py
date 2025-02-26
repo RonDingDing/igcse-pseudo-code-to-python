@@ -16,6 +16,7 @@ keywords = [
     (r"\bRETURN\b", "RETURN"),
     (r"\bFOR\b", "FOR"),
     (r"\bTO\b", "TO"),
+    (r"\bSTEP\b", "STEP"),
     (r"\bNEXT\b", "NEXT"),
     (r"\bIF\b", "IF"),
     (r"\bTHEN\b", "THEN"),
@@ -53,8 +54,13 @@ binary_operators = [
     (r"\^", "POW"),
     # (r"\:", "COLON"),
     (r"\←", "ASSIGN"),
+    (r"\bAND\b", "AND"),
+    (r"\bOR\b", "OR"),
+    (r"\bNOT\b", "NOT"),
 ]
 binary_operators_types = [x[1] for x in binary_operators]
+
+unary_operators_types = ["ADD", "SUB"]
 
 functions = [
     (r"\bDIV\b", "DIV"),
@@ -118,7 +124,9 @@ def tokenize(code):
                 pos = match.end()
                 break
         else:
-            raise SyntaxError(f"Unexpected character at line: {line}:{pos - last_col_num + 1} : {code[pos]}")
+            raise SyntaxError(
+                f"Unexpected character at line: {line}:{pos - last_col_num + 1} : {code[pos]}"
+            )
     return tokens
 
 
@@ -150,7 +158,9 @@ class Parser:
 
     def consume(self, token_type: Optional[str] = None) -> Optional[Token]:
         if token_type and self.current_token and self.current_token.type != token_type:
-            raise SyntaxError(f"Expected {token_type}, got {self.current_token.type}, {self.current_token}")
+            raise SyntaxError(
+                f"Expected {token_type}, got {self.current_token.type}, {self.current_token}"
+            )
         token = self.current_token
         self.pos += 1
         if self.pos < len(self.tokens):
@@ -170,8 +180,6 @@ class Parser:
 
     def parse_statement(self) -> dict:
         """Statement ::= Declaration | Assignment | ControlStructure | IOStatement | ProcedureCall | ReturnStatement"""
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         token = self.current_token
         if not token:
             return {}
@@ -184,8 +192,8 @@ class Parser:
         elif token.type == "CONSTANT":
             result = self.parse_constant()
 
-        elif token.type == "ASSIGN":
-            result = self.parse_assignment()
+        # elif token.type == "ASSIGN":
+        #     result = self.parse_assignment()
 
         # 控制结构
         elif token.type in ("IF", "WHILE", "REPEAT", "FOR"):
@@ -237,9 +245,6 @@ class Parser:
                 "type": "ExpressionStatement",
                 "expression": self.parse_expression(),
             }
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
-        print(result)
         return result
 
     def parse_return(self) -> dict:
@@ -275,19 +280,11 @@ class Parser:
 
             # 检查冒号分隔符
             if not (self.current_token and self.current_token.type == "COLON"):
-                raise SyntaxError(
-                    f"Expected ':' after case condition"
-                )
+                raise SyntaxError(f"Expected ':' after case condition")
             self.consume("COLON")
 
             # 解析分支语句块
-            # while self.current_token and self.current_token.type == "NEWLINE":
-            #     self.consume("NEWLINE")
             stmt = self.parse_statement()
-
-            # while self.current_token and self.current_token.type == "NEWLINE":
-            #     self.consume("NEWLINE")
-
             cases.append({"condition": condition, "body": stmt})
 
         # 处理OTHERWISE分支
@@ -295,22 +292,14 @@ class Parser:
             self.consume("OTHERWISE")
             otherwise = []
             while self.current_token and self.current_token.type != "ENDCASE":
-                # while self.current_token and self.current_token.type == "NEWLINE":
-                #     self.consume("NEWLINE")
                 stmt = self.parse_statement()
                 if stmt:
                     otherwise.append(stmt)
-                # while self.current_token and self.current_token.type == "NEWLINE":
-                #     self.consume("NEWLINE")
 
         # 验证ENDCASE
         if not self.current_token or self.current_token.type != "ENDCASE":
-            raise SyntaxError(
-                f"Unclosed CASE statement"
-            )
+            raise SyntaxError(f"Unclosed CASE statement")
         self.consume("ENDCASE")
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         return {
             "type": "CaseStatement",
             "expression": case_expression,
@@ -325,8 +314,6 @@ class Parser:
         if not file_id_token:
             raise SyntaxError("Expected file identifier after CLOSEFILE")
         file_id = file_id_token.value
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         return {"type": "CloseFile", "file": file_id}
 
     def parse_readfile(self) -> dict:
@@ -418,7 +405,7 @@ class Parser:
                     raise SyntaxError("Expected identifier in procedure declaration")
                 param_name = param_token.value
                 self.consume("COLON")
-                param = self.parse_data_type(param_name, "ParamType")
+                param = self.parse_data_type(param_name)
                 parameters.append(param)
                 # 处理逗号分隔符
                 if self.current_token and self.current_token.type == "COMMA":
@@ -427,17 +414,13 @@ class Parser:
 
         if typin == "FUNCTION":
             self.consume("RETURNS")
-            returned = self.parse_data_type("", "ReturnType")
+            returned = self.parse_data_type("")
 
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         # 解析过程体
         body = []
         while self.current_token and self.current_token.type != end_keyword:
             body.append(self.parse_statement())
 
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         # 消耗结尾词
         self.consume(end_keyword)
 
@@ -465,8 +448,6 @@ class Parser:
             if self.current_token.type != "COMMA":
                 break
             self.consume("COMMA")
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         return {"type": "InputStatement", "elements": elements}
 
     def parse_output(self) -> dict:
@@ -483,8 +464,6 @@ class Parser:
                 self.consume("COMMA")
             else:
                 break
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         return {"type": "OutputStatement", "expressions": expressions}
 
     def parse_declaration(self) -> dict:
@@ -497,16 +476,18 @@ class Parser:
         self.consume("COLON")
         if not self.current_token:
             return {}
-        return self.parse_data_type(identifier, "Declaration")
+        return self.parse_data_type(identifier)
 
-    def parse_data_type(self, identifier: str = "", node_type: str = "") -> dict:
+    def parse_data_type(self, identifier: str = "") -> dict:
         if not self.current_token:
             raise SyntaxError("Expected DATATYPE")
         if self.current_token.type == "ARRAY":
             # 数组声明
-            return self.parse_array_declaration(identifier, node_type)
+            return self.parse_array_declaration(identifier, "ArrayDeclaration")
         else:
-            return self.parse_simple_variable_declaration(identifier, node_type)
+            return self.parse_simple_variable_declaration(
+                identifier, "SimpleVariableDeclaration"
+            )
 
     def parse_simple_variable_declaration(
         self, identifier: str, node_type: str
@@ -517,8 +498,6 @@ class Parser:
         if not data_type_token:
             raise SyntaxError("Expected identifier after DECLARE")
         data_type = data_type_token.value
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
         return {
             "type": node_type,
             "is_array": False,
@@ -560,28 +539,40 @@ class Parser:
 
     def parse_expression(self) -> dict:
         """表达式解析（处理运算符优先级）"""
-        result = self.parse_binary_expression(0)
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
+        result = self.parse_unary_expression()
         return result
+
+    def parse_unary_expression(self) -> dict:
+        """解析一元表达式"""
+        token = self.current_token
+        if token and token.type in unary_operators_types:
+            self.consume()
+            operand = self.parse_primary()
+            return {
+                "type": "UnaryExpression",
+                "operator": token.type,
+                "operand": operand,
+            }
+        return self.parse_binary_expression(0)
 
     def get_precedence(self, token_type: str) -> int:
         """运算符优先级定义"""
         precedence = {
             "OR": 1,
             "AND": 2,
-            "EQ": 3,
-            "NEQ": 3,
-            "LT": 3,
-            "LEQ": 3,
-            "GT": 3,
-            "GEQ": 3,
-            "ADD": 4,
-            "SUB": 4,
-            "MUL": 5,
-            "DIV": 5,
-            "MOD": 5,
-            "POW": 6,
+            "NOT": 3,
+            "EQ": 4,
+            "NEQ": 4,
+            "LT": 4,
+            "LEQ": 4,
+            "GT": 4,
+            "GEQ": 4,
+            "ADD": 5,
+            "SUB": 5,
+            "MUL": 6,
+            "DIV": 6,
+            "MOD": 6,
+            "POW": 7,
         }
         return precedence.get(token_type, 0)
 
@@ -760,8 +751,6 @@ class Parser:
             raise SyntaxError("Expected identifier after NEXT")
         if id_token.value != var_name:
             raise SyntaxError(f"Loop variable mismatch: {id_token.value} != {var_name}")
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
 
         return {
             "type": "ForLoop",
@@ -824,16 +813,14 @@ class Parser:
             return token.value[1:-1]  # Remove quotes
         return token.value  # STRING类型直接返回
 
-    def parse_assignment(self) -> dict:
-        """支持多维数组和复杂表达式的赋值解析"""
-        # 解析左侧目标（支持数组访问）
-        target = self.parse_lvalue()
-        self.consume("ASSIGN")  # 消费赋值符号 ←
-        value = self.parse_expression()
-        # while self.current_token and self.current_token.type == "NEWLINE":
-        #     self.consume("NEWLINE")
+    # def parse_assignment(self) -> dict:
+    #     """支持多维数组和复杂表达式的赋值解析"""
+    #     # 解析左侧目标（支持数组访问）
+    #     target = self.parse_lvalue()
+    #     self.consume("ASSIGN")  # 消费赋值符号 ←
+    #     value = self.parse_expression()
 
-        return {"type": "Assignment", "target": target, "value": value}
+    #     return {"type": "Assignment", "target": target, "value": value}
 
     def parse_lvalue(self) -> dict:
         """解析可赋值目标（标识符或数组访问）"""
@@ -864,12 +851,216 @@ class Parser:
         return {"type": "Identifier", "name": identifier}
 
 
+
+def ast_to_python(ast: dict) -> str:
+    """将语法树转换为Python代码"""
+    default_values = {
+        "INTEGER": "int()",
+        "STRING": "str()",
+        "CHAR": "str()",
+        "BOOLEAN": "bool()",
+        "REAL": "float()",
+    }
+    data_type_conv = {
+        "INTEGER": "int",
+        "STRING": "str",
+        "CHAR": "str",
+        "BOOLEAN": "bool",
+        "REAL": "float",
+    }
+    ast_type = ast["type"]
+    if ast_type == "Program":
+        pre_string = """
+import random
+def DIV(a, b):
+    return a // b
+
+def MOD(a, b):
+    return a % b
+
+def LENGTH(s):
+    return len(s)
+
+def LCASE(s):
+    return s.lower()
+
+def UCASE(s):
+    return s.upper()
+
+def SUBSTRING(s, start, length):
+    return s[start:start+length]
+
+def ROUND(n, d):
+    return round(n, d)
+
+def RANDOM():
+    return random.random()
+
+####################
+
+"""
+        return pre_string + "\n".join(ast_to_python(stmt) for stmt in ast["statements"])
+    elif ast_type == "SimpleVariableDeclaration":
+        default_value = default_values[ast["data_type"]]
+        data_type = data_type_conv[ast["data_type"]]
+        return f"{ast['identifier']}: {data_type} = {default_value}"
+
+    elif ast_type == "ArrayDeclaration":
+        default_value = default_values[ast["data_type"]]
+        single = f"[{default_value}]"
+        for i in ast["dimensions"]:
+            upper = f"{ast_to_python(i['upper'])}"
+            lower = f"{ast_to_python(i['lower'])}"
+            pattern = r"[a-zA-Z_][a-zA-Z0-9_]*"
+            has_string = False
+            if re.search(pattern, upper):
+                has_string = True
+            if re.search(pattern, lower):
+                has_string = True
+            if has_string:
+                num = f"({upper}) - ({lower}) + 1"
+            else:
+                num = eval(f"{upper} - {lower} + 1")
+            if isinstance(num, str):
+                single = f"[{single} * ({num})]"
+            else:
+                single = f"[{single} * {num}]"
+        return f"{ast['identifier']}: list = {single}"
+
+    elif ast_type == "ConstantDeclaration":
+        return f"{ast['identifier']} = {ast['value']}"
+
+    elif ast_type == "Assignment":
+        return f"{ast_to_python(ast['target'])} = {ast_to_python(ast['value'])}"
+
+    elif ast_type == "Identifier":
+        return ast["name"]
+
+    elif ast_type == "Literal":
+        return repr(ast["value"])
+
+    elif ast_type == "UnaryExpression":
+        return f"{ast['operator']} {ast_to_python(ast['operand'])}"
+
+    elif ast_type == "BinaryExpression":
+        dic = {
+            "ADD": "+",
+            "SUB": "-",
+            "MUL": "*",
+            "DIW": "/",
+            "NEQ": "!=",
+            "GEQ": ">=",
+            "LEQ": "<=",
+            "GT": ">",
+            "LT": "<",
+            "EQ": "==",
+            "POW": "**",
+            "ASSIGN": "=",
+            "AND": "and",
+            "OR": "or",
+            "NOT": "not",
+        }
+        return f"{ast_to_python(ast['left'])} {dic[ast['operator']]} {ast_to_python(ast['right'])}"
+
+    elif ast_type == "IfStatement":
+        then_block = "\n".join(ast_to_python(stmt) for stmt in ast["then_block"])
+        else_block = (
+            "\n".join(ast_to_python(stmt) for stmt in ast["else_block"])
+            if ast["else_block"]
+            else ""
+        )
+        else_start = "else:\n" if ast["else_block"] else ""
+        return f"if {ast_to_python(ast['condition'])}:\n{indent(then_block)}\n{else_start}{indent(else_block)}"
+
+    elif ast_type == "WhileLoop":
+        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
+        return f"while {ast_to_python(ast['condition'])}:\n{indent(body)}"
+    elif ast_type == "RepeatLoop":
+        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
+        return f"while True:\n{indent(body)}\n    if {ast_to_python(ast['condition'])}:\n        break"
+
+    elif ast_type == "ForLoop":
+        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
+        step = f", {ast_to_python(ast['step'])}" if ast["step"] else ""
+        return f"for {ast['variable']} in range({ast_to_python(ast['start'])}, {ast_to_python(ast['end'])}{step}):\n{indent(body)}"
+
+    elif ast_type == "ProcedureCall":
+        args = ", ".join(ast_to_python(arg) for arg in ast["arguments"])
+        return f"{ast['name']}({args})"
+
+    elif ast_type == "FunctionCall":
+        args = ", ".join(ast_to_python(arg) for arg in ast["arguments"])
+        return f"{ast['function']}({args})"
+
+    elif ast_type == "ReturnStatement":
+        return f"return {ast_to_python(ast['expression'])}"
+
+    elif ast_type == "InputStatement":
+        elements = ", ".join(ast_to_python(elem) for elem in ast["elements"])
+        return f"{elements} = input()"
+
+    elif ast_type == "OutputStatement":
+        expressions = ", ".join(ast_to_python(expr) for expr in ast["expressions"])
+        return f"print({expressions})"
+
+    elif ast_type == "ArrayAccess":
+        indices = "".join(f"[{ast_to_python(index)}]" for index in ast["indices"])
+        return f"{ast['array']}{indices}"
+
+    elif ast_type == "OpenFile":
+        return f"{ast['file']} = open({ast['file']}, '{ast['mode'].lower()}')"
+
+    elif ast_type == "CloseFile":
+        return f"{ast['file']}.close()"
+
+    elif ast_type == "ReadFile":
+        return f"{ast['target']} = {ast['file']}.read()"
+
+    elif ast_type == "WriteFile":
+        return f"{ast['file']}.write({ast['target']})"
+
+    elif ast_type == "CaseStatement":
+        cases = f"__case = {ast_to_python(ast['expression'])}\n"
+        for i,  case in enumerate(ast['cases']):
+            if_key = "elif"
+            if i == 0:
+                if_key = "if"
+            segment = f"{if_key} __case == {ast_to_python(case['condition'])}:\n{indent(ast_to_python(case['body']))}\n"
+            cases += segment
+        if ast["otherwise"]:
+            otherwise = f"else:\n"
+            for ot in ast["otherwise"]:
+                otherwise += f"{indent(ast_to_python(ot))}"
+        return f"{cases}{otherwise}"
+
+    elif ast_type == "ProcedureDeclaration":
+        params = ", ".join(param["identifier"] for param in ast["parameters"])
+        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
+        return f"def {ast['name']}({params}):\n{indent(body)}"
+
+    elif ast_type == "FunctionDeclaration":
+        params = ", ".join(param["identifier"] for param in ast["parameters"])
+        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
+        return f"def {ast['name']}({params}):\n{indent(body)}"
+    elif ast_type == "ExpressionStatement":
+        return ast_to_python(ast["expression"])
+    else:
+        raise ValueError(f"Unknown AST node type: {ast['type']}")
+
+
+def indent(code: str, level: int = 1) -> str:
+    """缩进代码"""
+    return "\n".join("    " * level + line for line in code.split("\n"))
+
+
 if __name__ == "__main__":
 
     def run_test(code):
         tokens = tokenize(code)
         ast = Parser(tokens).parse_program()
-        print(json.dumps(ast, default=lambda o: o.__dict__, indent=2))
+        print(json.dumps(ast, indent=2))
+        python_code = ast_to_python(ast)
+        return python_code
 
     import os
 
@@ -877,5 +1068,7 @@ if __name__ == "__main__":
         if f.endswith(".txt"):
             with open("tests/" + f, "r", encoding="utf8") as file:
                 print(f"--- {f} ---")
-                run_test(file.read())
+                code = run_test(file.read())
+                with open(f + ".py", "w", encoding="utf-8") as fp:
+                    fp.write(code)
                 print()

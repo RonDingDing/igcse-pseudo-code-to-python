@@ -1,0 +1,5 @@
+DECLARE Counter : INTEGER
+DECLARE Apple: INTEGER
+Counter ← 4
+Apple ← (Counter + Counter) * 3
+DECLARE Matrix : ARRAY[1: Counter, 1: Apple] OF INTEGER
