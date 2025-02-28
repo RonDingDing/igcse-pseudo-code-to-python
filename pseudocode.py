@@ -86,6 +86,8 @@ specs = [
     (r'"[^"]*"', "STRING"),
     (r"'[^']*'", "STRING"),
     (r"\b(INTEGER|STRING|CHAR|BOOLEAN|REAL)\b", "DATATYPE"),
+    (r"\bTRUE\b", "TRUE"),
+    (r"\bFALSE\b", "FALSE"),
     (r"[a-zA-Z_][a-zA-Z0-9_]*", "IDENTIFIER"),  # 放在最后
 ]
 
@@ -150,6 +152,24 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
         self.current_token = self.tokens[0] if tokens else None
+        self.scope_stack = [{}]  # 作用域栈，初始为全局作用域
+
+    def enter_scope(self):
+        self.scope_stack.append({})
+
+    def exit_scope(self):
+        self.scope_stack.pop()
+
+    def declare_identifier(self, name: str, data_type: str):
+        self.scope_stack[-1][name] = data_type
+
+    def get_identifier_type(self, identifier: dict) -> str:
+        """获取标识符的类型"""
+        if identifier["type"] == "Identifier":
+            for scope in reversed(self.scope_stack):
+                if identifier["name"] in scope:
+                    return scope[identifier["name"]]
+        return "UNKNOWN"
 
     def peek(self, lookahead: int = 0) -> Optional[Token]:
         if self.pos + lookahead < len(self.tokens):
@@ -417,9 +437,13 @@ class Parser:
             returned = self.parse_data_type("")
 
         # 解析过程体
+        self.enter_scope()
+        for param in parameters:
+            self.declare_identifier(param["identifier"], param["data_type"])
         body = []
         while self.current_token and self.current_token.type != end_keyword:
             body.append(self.parse_statement())
+        self.exit_scope()
 
         # 消耗结尾词
         self.consume(end_keyword)
@@ -444,7 +468,9 @@ class Parser:
                 break
             if self.current_token.type != "IDENTIFIER":
                 raise SyntaxError("Expected identifier after INPUT")
-            elements.append(self.parse_primary())
+            identifier = self.parse_primary()
+            identifier_type = self.get_identifier_type(identifier)
+            elements.append({"identifier": identifier, "identifier_type": identifier_type})
             if self.current_token.type != "COMMA":
                 break
             self.consume("COMMA")
@@ -476,7 +502,13 @@ class Parser:
         self.consume("COLON")
         if not self.current_token:
             return {}
-        return self.parse_data_type(identifier)
+        declaration = self.parse_data_type(identifier)
+        if declaration["is_array"]:
+            dimensions = len(declaration["dimensions"])
+            self.declare_identifier(identifier, f"ARRAY{'[' * dimensions + ']' * dimensions} OF {declaration['data_type']}")
+        else:
+            self.declare_identifier(identifier, declaration["data_type"])
+        return declaration
 
     def parse_data_type(self, identifier: str = "") -> dict:
         if not self.current_token:
@@ -661,6 +693,10 @@ class Parser:
                     self.consume("COMMA")
             self.consume("RPAREN")
             return {"type": "FunctionCall", "function": token.type, "arguments": args}
+
+        # TRUE, FALSE
+        elif token.type in ("TRUE", "FALSE"):
+            return {"type": "Literal", "value": token.type == "TRUE"}
 
         else:
             raise SyntaxError(f"Unexpected token: {token}")
@@ -851,201 +887,246 @@ class Parser:
         return {"type": "Identifier", "name": identifier}
 
 
+class Pseudocode:
+    def __init__(self) -> None:
+        self.pre_string = ""
 
-def ast_to_python(ast: dict) -> str:
-    """将语法树转换为Python代码"""
-    default_values = {
-        "INTEGER": "int()",
-        "STRING": "str()",
-        "CHAR": "str()",
-        "BOOLEAN": "bool()",
-        "REAL": "float()",
-    }
-    data_type_conv = {
-        "INTEGER": "int",
-        "STRING": "str",
-        "CHAR": "str",
-        "BOOLEAN": "bool",
-        "REAL": "float",
-    }
-    ast_type = ast["type"]
-    if ast_type == "Program":
-        pre_string = """
-import random
+        div_pre_string = """
 def DIV(a, b):
-    return a // b
+    return a / b
 
+"""
+        mod_pre_string = """
 def MOD(a, b):
     return a % b
 
+"""
+        len_pre_string = """
 def LENGTH(s):
     return len(s)
 
+"""
+        lcase_pre_string = """
 def LCASE(s):
     return s.lower()
 
+"""
+        ucase_pre_string = """
 def UCASE(s):
     return s.upper()
 
-def SUBSTRING(s, start, length):
-    return s[start:start+length]
-
+"""
+        roundpre_string = """
 def ROUND(n, d):
     return round(n, d)
 
-def RANDOM():
-    return random.random()
-
-####################
+"""
+        substring_pre_string = """
+def SUBSTRING(s, start, length):
+    return s[start:start+length]
 
 """
-        return pre_string + "\n".join(ast_to_python(stmt) for stmt in ast["statements"])
-    elif ast_type == "SimpleVariableDeclaration":
-        default_value = default_values[ast["data_type"]]
-        data_type = data_type_conv[ast["data_type"]]
-        return f"{ast['identifier']}: {data_type} = {default_value}"
+        random_pre_string = """
+import random
 
-    elif ast_type == "ArrayDeclaration":
-        default_value = default_values[ast["data_type"]]
-        single = f"[{default_value}]"
-        for i in ast["dimensions"]:
-            upper = f"{ast_to_python(i['upper'])}"
-            lower = f"{ast_to_python(i['lower'])}"
-            pattern = r"[a-zA-Z_][a-zA-Z0-9_]*"
-            has_string = False
-            if re.search(pattern, upper):
-                has_string = True
-            if re.search(pattern, lower):
-                has_string = True
-            if has_string:
-                num = f"({upper}) - ({lower}) + 1"
-            else:
-                num = eval(f"{upper} - {lower} + 1")
-            if isinstance(num, str):
-                single = f"[{single} * ({num})]"
-            else:
-                single = f"[{single} * {num}]"
-        return f"{ast['identifier']}: list = {single}"
-
-    elif ast_type == "ConstantDeclaration":
-        return f"{ast['identifier']} = {ast['value']}"
-
-    elif ast_type == "Assignment":
-        return f"{ast_to_python(ast['target'])} = {ast_to_python(ast['value'])}"
-
-    elif ast_type == "Identifier":
-        return ast["name"]
-
-    elif ast_type == "Literal":
-        return repr(ast["value"])
-
-    elif ast_type == "UnaryExpression":
-        return f"{ast['operator']} {ast_to_python(ast['operand'])}"
-
-    elif ast_type == "BinaryExpression":
-        dic = {
-            "ADD": "+",
-            "SUB": "-",
-            "MUL": "*",
-            "DIW": "/",
-            "NEQ": "!=",
-            "GEQ": ">=",
-            "LEQ": "<=",
-            "GT": ">",
-            "LT": "<",
-            "EQ": "==",
-            "POW": "**",
-            "ASSIGN": "=",
-            "AND": "and",
-            "OR": "or",
-            "NOT": "not",
+def RANDOM():
+    return random.random()
+"""
+        self.pre_string_dic = {
+            "DIV": div_pre_string,
+            "MOD": mod_pre_string,
+            "LENGTH": len_pre_string,
+            "LCASE": lcase_pre_string,
+            "UCASE": ucase_pre_string,
+            "ROUND": roundpre_string,
+            "SUBSTRING": substring_pre_string,
+            "RANDOM": random_pre_string,
         }
-        return f"{ast_to_python(ast['left'])} {dic[ast['operator']]} {ast_to_python(ast['right'])}"
 
-    elif ast_type == "IfStatement":
-        then_block = "\n".join(ast_to_python(stmt) for stmt in ast["then_block"])
-        else_block = (
-            "\n".join(ast_to_python(stmt) for stmt in ast["else_block"])
-            if ast["else_block"]
-            else ""
-        )
-        else_start = "else:\n" if ast["else_block"] else ""
-        return f"if {ast_to_python(ast['condition'])}:\n{indent(then_block)}\n{else_start}{indent(else_block)}"
+    def ast_to_python(self, ast: dict) -> str:
+        """将语法树转换为Python代码"""
+        default_values = {
+            "INTEGER": "int()",
+            "STRING": "str()",
+            "CHAR": "str()",
+            "BOOLEAN": "bool()",
+            "REAL": "float()",
+        }
+        data_type_conv = {
+            "INTEGER": "int",
+            "STRING": "str",
+            "CHAR": "str",
+            "BOOLEAN": "bool",
+            "REAL": "float",
+        }
+        ast_type = ast["type"]
+        if ast_type == "Program":
 
-    elif ast_type == "WhileLoop":
-        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
-        return f"while {ast_to_python(ast['condition'])}:\n{indent(body)}"
-    elif ast_type == "RepeatLoop":
-        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
-        return f"while True:\n{indent(body)}\n    if {ast_to_python(ast['condition'])}:\n        break"
+            ####################
+            code = "\n".join(self.ast_to_python(stmt) for stmt in ast["statements"])
+            return self.pre_string + code
+        
+        elif ast_type == "SimpleVariableDeclaration":
+            default_value = default_values[ast["data_type"]]
+            data_type = data_type_conv[ast["data_type"]]
+            return f"{ast['identifier']}: {data_type} = {default_value}"
 
-    elif ast_type == "ForLoop":
-        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
-        step = f", {ast_to_python(ast['step'])}" if ast["step"] else ""
-        return f"for {ast['variable']} in range({ast_to_python(ast['start'])}, {ast_to_python(ast['end'])}{step}):\n{indent(body)}"
+        elif ast_type == "ArrayDeclaration":
+            default_value = default_values[ast["data_type"]]
+            single = f"{default_value}"
+            for i in ast["dimensions"]:
+                upper = f"{self.ast_to_python(i['upper'])}"
+                lower = f"{self.ast_to_python(i['lower'])}"
+                pattern = r"[a-zA-Z_][a-zA-Z0-9_]*"
+                has_string = False
+                if re.search(pattern, upper):
+                    has_string = True
+                if re.search(pattern, lower):
+                    has_string = True
+                if has_string:
+                    num = f"({upper}) - ({lower})"
+                else:
+                    num = eval(f"{upper} - {lower}")
+                if isinstance(num, str):
+                    single = f"[{single}] * ({num})"
+                else:
+                    single = f"[{single}] * {num}"
+            return f"{ast['identifier']}: list = {single}"
 
-    elif ast_type == "ProcedureCall":
-        args = ", ".join(ast_to_python(arg) for arg in ast["arguments"])
-        return f"{ast['name']}({args})"
+        elif ast_type == "ConstantDeclaration":
+            return f"{ast['identifier']} = {ast['value']}"
 
-    elif ast_type == "FunctionCall":
-        args = ", ".join(ast_to_python(arg) for arg in ast["arguments"])
-        return f"{ast['function']}({args})"
+        elif ast_type == "Assignment":
+            target_code = self.ast_to_python(ast['target'])
+            value_code = self.ast_to_python(ast['value'])
+            if ast['target_type'] in data_type_conv:
+                value_code = f"{data_type_conv[ast['target_type']]}({value_code})"
+            return f"{target_code} = {value_code}"
 
-    elif ast_type == "ReturnStatement":
-        return f"return {ast_to_python(ast['expression'])}"
+        elif ast_type == "Identifier":
+            return ast["name"]
 
-    elif ast_type == "InputStatement":
-        elements = ", ".join(ast_to_python(elem) for elem in ast["elements"])
-        return f"{elements} = input()"
+        elif ast_type == "Literal":
+            return repr(ast["value"])
 
-    elif ast_type == "OutputStatement":
-        expressions = ", ".join(ast_to_python(expr) for expr in ast["expressions"])
-        return f"print({expressions})"
+        elif ast_type == "UnaryExpression":
+            return f"{ast['operator']} {self.ast_to_python(ast['operand'])}"
 
-    elif ast_type == "ArrayAccess":
-        indices = "".join(f"[{ast_to_python(index)}]" for index in ast["indices"])
-        return f"{ast['array']}{indices}"
+        elif ast_type == "BinaryExpression":
+            dic = {
+                "ADD": "+",
+                "SUB": "-",
+                "MUL": "*",
+                "DIW": "/",
+                "NEQ": "!=",
+                "GEQ": ">=",
+                "LEQ": "<=",
+                "GT": ">",
+                "LT": "<",
+                "EQ": "==",
+                "POW": "**",
+                "ASSIGN": "=",
+                "AND": "and",
+                "OR": "or",
+                "NOT": "not",
+            }
+            return f"{self.ast_to_python(ast['left'])} {dic[ast['operator']]} {self.ast_to_python(ast['right'])}"
 
-    elif ast_type == "OpenFile":
-        return f"{ast['file']} = open({ast['file']}, '{ast['mode'].lower()}')"
+        elif ast_type == "IfStatement":
+            then_block = "\n".join(
+                self.ast_to_python(stmt) for stmt in ast["then_block"]
+            )
+            else_block = (
+                "\n".join(self.ast_to_python(stmt) for stmt in ast["else_block"])
+                if ast["else_block"]
+                else ""
+            )
+            else_start = "else:\n" if ast["else_block"] else ""
+            return f"if {self.ast_to_python(ast['condition'])}:\n{indent(then_block)}\n{else_start}{indent(else_block)}"
 
-    elif ast_type == "CloseFile":
-        return f"{ast['file']}.close()"
+        elif ast_type == "WhileLoop":
+            body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
+            return f"while {self.ast_to_python(ast['condition'])}:\n{indent(body)}"
+        
+        elif ast_type == "RepeatLoop":
+            body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
+            return f"while True:\n{indent(body)}\n    if {self.ast_to_python(ast['condition'])}:\n        break"
 
-    elif ast_type == "ReadFile":
-        return f"{ast['target']} = {ast['file']}.read()"
+        elif ast_type == "ForLoop":
+            body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
+            step = f", {self.ast_to_python(ast['step'])}" if ast["step"] else ""
+            return f"for {ast['variable']} in range({self.ast_to_python(ast['start'])}, {self.ast_to_python(ast['end'])}{step}):\n{indent(body)}"
 
-    elif ast_type == "WriteFile":
-        return f"{ast['file']}.write({ast['target']})"
+        elif ast_type == "ProcedureCall":
+            args = ", ".join(self.ast_to_python(arg) for arg in ast["arguments"])
+            return f"{ast['name']}({args})"
 
-    elif ast_type == "CaseStatement":
-        cases = f"__case = {ast_to_python(ast['expression'])}\n"
-        for i,  case in enumerate(ast['cases']):
-            if_key = "elif"
-            if i == 0:
-                if_key = "if"
-            segment = f"{if_key} __case == {ast_to_python(case['condition'])}:\n{indent(ast_to_python(case['body']))}\n"
-            cases += segment
-        if ast["otherwise"]:
-            otherwise = f"else:\n"
-            for ot in ast["otherwise"]:
-                otherwise += f"{indent(ast_to_python(ot))}"
-        return f"{cases}{otherwise}"
+        elif ast_type == "FunctionCall":
+            if ast["function"] in self.pre_string_dic and self.pre_string_dic[ast["function"]] not in self.pre_string:
+                self.pre_string += self.pre_string_dic[ast["function"]]
+            args = ", ".join(self.ast_to_python(arg) for arg in ast["arguments"])
+            return f"{ast['function']}({args})"
 
-    elif ast_type == "ProcedureDeclaration":
-        params = ", ".join(param["identifier"] for param in ast["parameters"])
-        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
-        return f"def {ast['name']}({params}):\n{indent(body)}"
+        elif ast_type == "ReturnStatement":
+            return f"return {self.ast_to_python(ast['expression'])}"
 
-    elif ast_type == "FunctionDeclaration":
-        params = ", ".join(param["identifier"] for param in ast["parameters"])
-        body = "\n".join(ast_to_python(stmt) for stmt in ast["body"])
-        return f"def {ast['name']}({params}):\n{indent(body)}"
-    elif ast_type == "ExpressionStatement":
-        return ast_to_python(ast["expression"])
-    else:
-        raise ValueError(f"Unknown AST node type: {ast['type']}")
+        elif ast_type == "InputStatement":
+            return "\n".join(f'{self.ast_to_python(elem["identifier"])} = {data_type_conv[elem["identifier_type"]]}(input())' for elem in ast["elements"])
+            
+
+        elif ast_type == "OutputStatement":
+            expressions = ", ".join(
+                self.ast_to_python(expr) for expr in ast["expressions"]
+            )
+            return f"print({expressions})"
+
+        elif ast_type == "ArrayAccess":
+            indices = "".join(
+                f"[{self.ast_to_python(index)}]" for index in ast["indices"]
+            )
+            return f"{ast['array']}{indices}"
+
+        elif ast_type == "OpenFile":
+            return f"{ast['file']} = open({ast['file']}, '{ast['mode'].lower()}')"
+
+        elif ast_type == "CloseFile":
+            return f"{ast['file']}.close()"
+
+        elif ast_type == "ReadFile":
+            return f"{ast['target']} = {ast['file']}.read()"
+
+        elif ast_type == "WriteFile":
+            return f"{ast['file']}.write({ast['target']})"
+
+        elif ast_type == "CaseStatement":
+            cases = f"__case = {self.ast_to_python(ast['expression'])}\n"
+            for i, case in enumerate(ast["cases"]):
+                if_key = "elif"
+                if i == 0:
+                    if_key = "if"
+                segment = f"{if_key} __case == {self.ast_to_python(case['condition'])}:\n{indent(self.ast_to_python(case['body']))}\n"
+                cases += segment
+            if ast["otherwise"]:
+                otherwise = f"else:\n"
+                for ot in ast["otherwise"]:
+                    otherwise += f"{indent(self.ast_to_python(ot))}"
+            return f"{cases}{otherwise}"
+
+        elif ast_type == "ProcedureDeclaration":
+            params = ", ".join(f"{param['identifier']}: {data_type_conv[param['data_type']]}" for param in ast["parameters"])
+            body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
+            return f"def {ast['name']}({params}):\n{indent(body)}"
+
+        elif ast_type == "FunctionDeclaration":
+            params = ", ".join(f"{param['identifier']}: {data_type_conv[param['data_type']]}" for param in ast["parameters"])
+            body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
+            return f"def {ast['name']}({params}):\n{indent(body)}"
+        
+        elif ast_type == "ExpressionStatement":
+            return self.ast_to_python(ast["expression"])
+        
+        else:
+            raise ValueError(f"Unknown AST node type: {ast['type']}")
 
 
 def indent(code: str, level: int = 1) -> str:
@@ -1059,7 +1140,7 @@ if __name__ == "__main__":
         tokens = tokenize(code)
         ast = Parser(tokens).parse_program()
         print(json.dumps(ast, indent=2))
-        python_code = ast_to_python(ast)
+        python_code = Pseudocode().ast_to_python(ast)
         return python_code
 
     import os
