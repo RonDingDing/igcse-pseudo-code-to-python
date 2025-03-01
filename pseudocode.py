@@ -3,133 +3,138 @@ import re
 import json
 from typing import Optional, Any
 
-keywords = [
-    (r"\bDECLARE\b", "DECLARE"),
-    (r"\bARRAY\b", "ARRAY"),
-    (r"\bOF\b", "OF"),
-    (r"\bCONSTANT\b", "CONSTANT"),
-    (r"\bPROCEDURE\b", "PROCEDURE"),
-    (r"\bENDPROCEDURE\b", "ENDPROCEDURE"),
-    (r"\bFUNCTION\b", "FUNCTION"),
-    (r"\bENDFUNCTION\b", "ENDFUNCTION"),
-    (r"\bRETURNS\b", "RETURNS"),
-    (r"\bRETURN\b", "RETURN"),
-    (r"\bFOR\b", "FOR"),
-    (r"\bTO\b", "TO"),
-    (r"\bSTEP\b", "STEP"),
-    (r"\bNEXT\b", "NEXT"),
-    (r"\bIF\b", "IF"),
-    (r"\bTHEN\b", "THEN"),
-    (r"\bELSE\b", "ELSE"),
-    (r"\bENDIF\b", "ENDIF"),
-    (r"\bCASE\b", "CASE"),
-    (r"\bOTHERWISE\b", "OTHERWISE"),
-    (r"\bENDCASE\b", "ENDCASE"),
-    (r"\bREPEAT\b", "REPEAT"),
-    (r"\bUNTIL\b", "UNTIL"),
-    (r"\bWHILE\b", "WHILE"),
-    (r"\bDO\b", "DO"),
-    (r"\bENDWHILE\b", "ENDWHILE"),
-    (r"\bINPUT\b", "INPUT"),
-    (r"\bOUTPUT\b", "OUTPUT"),
-    (r"\bOPENFILE\b", "OPENFILE"),
-    (r"\bCLOSEFILE\b", "CLOSEFILE"),
-    (r"\bREADFILE\b", "READFILE"),
-    (r"\bWRITEFILE\b", "WRITEFILE"),
-    (r"\bCALL\b", "CALL"),
-    (r"\b(READ|WRITE)\b", "FILEMODE"),
-]
 
-binary_operators = [
-    (r"\+", "ADD"),
-    (r"\-", "SUB"),
-    (r"\*", "MUL"),
-    (r"\/", "DIW"),
-    (r"\<\>", "NEQ"),
-    (r"\>\=", "GEQ"),
-    (r"\<\=", "LEQ"),
-    (r"\>", "GT"),
-    (r"\<", "LT"),
-    (r"\=", "EQ"),
-    (r"\^", "POW"),
-    # (r"\:", "COLON"),
-    (r"\←", "ASSIGN"),
-    (r"\bAND\b", "AND"),
-    (r"\bOR\b", "OR"),
-    (r"\bNOT\b", "NOT"),
-]
-binary_operators_types = [x[1] for x in binary_operators]
+class Tokenizer:
+    keywords = [
+        (r"\bDECLARE\b", "DECLARE"),
+        (r"\bARRAY\b", "ARRAY"),
+        (r"\bOF\b", "OF"),
+        (r"\bCONSTANT\b", "CONSTANT"),
+        (r"\bPROCEDURE\b", "PROCEDURE"),
+        (r"\bENDPROCEDURE\b", "ENDPROCEDURE"),
+        (r"\bFUNCTION\b", "FUNCTION"),
+        (r"\bENDFUNCTION\b", "ENDFUNCTION"),
+        (r"\bRETURNS\b", "RETURNS"),
+        (r"\bRETURN\b", "RETURN"),
+        (r"\bFOR\b", "FOR"),
+        (r"\bTO\b", "TO"),
+        (r"\bSTEP\b", "STEP"),
+        (r"\bNEXT\b", "NEXT"),
+        (r"\bIF\b", "IF"),
+        (r"\bTHEN\b", "THEN"),
+        (r"\bELSE\b", "ELSE"),
+        (r"\bENDIF\b", "ENDIF"),
+        (r"\bCASE\b", "CASE"),
+        (r"\bOTHERWISE\b", "OTHERWISE"),
+        (r"\bENDCASE\b", "ENDCASE"),
+        (r"\bREPEAT\b", "REPEAT"),
+        (r"\bUNTIL\b", "UNTIL"),
+        (r"\bWHILE\b", "WHILE"),
+        (r"\bDO\b", "DO"),
+        (r"\bENDWHILE\b", "ENDWHILE"),
+        (r"\bINPUT\b", "INPUT"),
+        (r"\bOUTPUT\b", "OUTPUT"),
+        (r"\bOPENFILE\b", "OPENFILE"),
+        (r"\bCLOSEFILE\b", "CLOSEFILE"),
+        (r"\bREADFILE\b", "READFILE"),
+        (r"\bWRITEFILE\b", "WRITEFILE"),
+        (r"\bCALL\b", "CALL"),
+        (r"\b(READ|WRITE)\b", "FILEMODE"),
+    ]
 
-unary_operators_types = ["ADD", "SUB"]
+    binary_operators = [
+        (r"\+", "ADD"),
+        (r"\-", "SUB"),
+        (r"\*", "MUL"),
+        (r"\/", "DIW"),
+        (r"\<\>", "NEQ"),
+        (r"\>\=", "GEQ"),
+        (r"\<\=", "LEQ"),
+        (r"\>", "GT"),
+        (r"\<", "LT"),
+        (r"\=", "EQ"),
+        (r"\^", "POW"),
+        # (r"\:", "COLON"),
+        (r"\←", "ASSIGN"),
+        (r"\bAND\b", "AND"),
+        (r"\bOR\b", "OR"),
+        (r"\bNOT\b", "NOT"),
+    ]
+    binary_operators_types = [x[1] for x in binary_operators]
 
-functions = [
-    (r"\bDIV\b", "DIV"),
-    (r"\bMOD\b", "MOD"),
-    (r"\bLENGTH\b", "LENGTH"),
-    (r"\bLCASE\b", "LCASE"),
-    (r"\bUCASE\b", "UCASE"),
-    (r"\bSUBSTRING\b", "SUBSTRING"),
-    (r"\bRANDOM\b", "RANDOM"),
-    (r"\bROUND\b", "ROUND"),
-]
+    unary_operators_types = ["ADD", "SUB"]
 
-specs = [
-    (r"\:", "COLON"),
-    (r",", "COMMA"),
-    (r"\[", "LBRACKET"),
-    (r"\]", "RBRACKET"),
-    (r"\(", "LPAREN"),
-    (r"\)", "RPAREN"),
-    (r"\{", "LBRACE"),
-    (r"\}", "RBRACE"),
-    (r"\d+(\.\d+)?", "NUMBER"),
-    (r'"[^"]*"', "STRING"),
-    (r"'[^']*'", "STRING"),
-    (r"\b(INTEGER|STRING|CHAR|BOOLEAN|REAL)\b", "DATATYPE"),
-    (r"\bTRUE\b", "TRUE"),
-    (r"\bFALSE\b", "FALSE"),
-    (r"[a-zA-Z_][a-zA-Z0-9_]*", "IDENTIFIER"),  # 放在最后
-]
+    functions = [
+        (r"\bDIV\b", "DIV"),
+        (r"\bMOD\b", "MOD"),
+        (r"\bLENGTH\b", "LENGTH"),
+        (r"\bLCASE\b", "LCASE"),
+        (r"\bUCASE\b", "UCASE"),
+        (r"\bSUBSTRING\b", "SUBSTRING"),
+        (r"\bRANDOM\b", "RANDOM"),
+        (r"\bROUND\b", "ROUND"),
+    ]
 
-empty = [
-    (r"[ \t]+", None),  # Skip whitespace
-    (r"\n", None),  # new line
-    (r"\/\/.*", None),  # Comments
-]
+    specs = [
+        (r"\:", "COLON"),
+        (r",", "COMMA"),
+        (r"\[", "LBRACKET"),
+        (r"\]", "RBRACKET"),
+        (r"\(", "LPAREN"),
+        (r"\)", "RPAREN"),
+        (r"\{", "LBRACE"),
+        (r"\}", "RBRACE"),
+        (r"\d+(\.\d+)?", "NUMBER"),
+        (r'"[^"]*"', "STRING"),
+        (r"'[^']*'", "STRING"),
+        (r"\b(INTEGER|STRING|CHAR|BOOLEAN|REAL)\b", "DATATYPE"),
+        (r"\bTRUE\b", "TRUE"),
+        (r"\bFALSE\b", "FALSE"),
+        (r"[a-zA-Z_][a-zA-Z0-9_]*", "IDENTIFIER"),  # 放在最后
+    ]
 
-token_specs = empty + keywords + binary_operators + functions + specs
+    empty = [
+        (r"[ \t]+", None),  # Skip whitespace
+        (r"\n", None),  # new line
+        (r"\/\/.*", None),  # Comments
+    ]
 
+    token_specs = empty + keywords + binary_operators + functions + specs
 
-def tokenize(code):
-    tokens = []
-    pos = 0
-    line = 1
-    last_col_num = 0
-    while pos < len(code):
-        for pattern, token_type in token_specs:
-            regex = re.compile(pattern)
-            match = regex.match(code, pos)
-            if match:
-                if pattern == r"\n":
-                    line += 1
-                    last_col_num = match.end()
-                if token_type:
-                    value = match.group()
-                    token = Token(
-                        token_type,
-                        value,
-                        line,
-                        match.start() - last_col_num + 1,
-                        match.end() - last_col_num + 1,
-                    )
-                    tokens.append(token)
-                pos = match.end()
-                break
-        else:
-            raise SyntaxError(
-                f"Unexpected character at line: {line}:{pos - last_col_num + 1} : {code[pos]}"
-            )
-    return tokens
+    def __init__(self, code: str) -> None:
+        self.code = code
+
+    def tokenize(self) -> list[Token]:
+        code = self.code
+        tokens = []
+        pos = 0
+        line = 1
+        last_col_num = 0
+        while pos < len(self.code):
+            for pattern, token_type in self.token_specs:
+                regex = re.compile(pattern)
+                match = regex.match(code, pos)
+                if match:
+                    if pattern == r"\n":
+                        line += 1
+                        last_col_num = match.end()
+                    if token_type:
+                        value = match.group()
+                        token = Token(
+                            token_type,
+                            value,
+                            line,
+                            match.start() - last_col_num + 1,
+                            match.end() - last_col_num + 1,
+                        )
+                        tokens.append(token)
+                    pos = match.end()
+                    break
+            else:
+                raise SyntaxError(
+                    f"Unexpected character at line: {line}:{pos - last_col_num + 1} : {code[pos]}"
+                )
+        return tokens
 
 
 class Token:
@@ -211,9 +216,6 @@ class Parser:
 
         elif token.type == "CONSTANT":
             result = self.parse_constant()
-
-        # elif token.type == "ASSIGN":
-        #     result = self.parse_assignment()
 
         # 控制结构
         elif token.type in ("IF", "WHILE", "REPEAT", "FOR"):
@@ -470,7 +472,9 @@ class Parser:
                 raise SyntaxError("Expected identifier after INPUT")
             identifier = self.parse_primary()
             identifier_type = self.get_identifier_type(identifier)
-            elements.append({"identifier": identifier, "identifier_type": identifier_type})
+            elements.append(
+                {"identifier": identifier, "identifier_type": identifier_type}
+            )
             if self.current_token.type != "COMMA":
                 break
             self.consume("COMMA")
@@ -505,7 +509,10 @@ class Parser:
         declaration = self.parse_data_type(identifier)
         if declaration["is_array"]:
             dimensions = len(declaration["dimensions"])
-            self.declare_identifier(identifier, f"ARRAY{'[' * dimensions + ']' * dimensions} OF {declaration['data_type']}")
+            self.declare_identifier(
+                identifier,
+                f"ARRAY{'[' * dimensions + ']' * dimensions} OF {declaration['data_type']}",
+            )
         else:
             self.declare_identifier(identifier, declaration["data_type"])
         return declaration
@@ -577,7 +584,7 @@ class Parser:
     def parse_unary_expression(self) -> dict:
         """解析一元表达式"""
         token = self.current_token
-        if token and token.type in unary_operators_types:
+        if token and token.type in Tokenizer.unary_operators_types:
             self.consume()
             operand = self.parse_primary()
             return {
@@ -614,7 +621,10 @@ class Parser:
 
         while True:
             current_token = self.current_token
-            if not current_token or current_token.type not in binary_operators_types:
+            if (
+                not current_token
+                or current_token.type not in Tokenizer.binary_operators_types
+            ):
                 break
 
             precedence = self.get_precedence(current_token.type)
@@ -681,10 +691,10 @@ class Parser:
         elif token.type == "LPAREN":
             expr = self.parse_expression()
             self.consume("RPAREN")
-            return expr
+            return {"type": "Parenthesis", "operand": expr}
 
         # 函数调用
-        elif token.type in [f[1] for f in functions]:
+        elif token.type in [f[1] for f in Tokenizer.functions]:
             self.consume("LPAREN")
             args = []
             while self.current_token and self.current_token.type != "RPAREN":
@@ -697,6 +707,14 @@ class Parser:
         # TRUE, FALSE
         elif token.type in ("TRUE", "FALSE"):
             return {"type": "Literal", "value": token.type == "TRUE"}
+
+        elif token.type in Tokenizer.unary_operators_types:
+            operand = self.parse_primary()
+            return {
+                "type": "UnaryExpression",
+                "operator": token.type,
+                "operand": operand,
+            }
 
         else:
             raise SyntaxError(f"Unexpected token: {token}")
@@ -849,15 +867,6 @@ class Parser:
             return token.value[1:-1]  # Remove quotes
         return token.value  # STRING类型直接返回
 
-    # def parse_assignment(self) -> dict:
-    #     """支持多维数组和复杂表达式的赋值解析"""
-    #     # 解析左侧目标（支持数组访问）
-    #     target = self.parse_lvalue()
-    #     self.consume("ASSIGN")  # 消费赋值符号 ←
-    #     value = self.parse_expression()
-
-    #     return {"type": "Assignment", "target": target, "value": value}
-
     def parse_lvalue(self) -> dict:
         """解析可赋值目标（标识符或数组访问）"""
         # 基础标识符
@@ -888,91 +897,109 @@ class Parser:
 
 
 class Pseudocode:
-    def __init__(self) -> None:
-        self.pre_string = ""
 
-        div_pre_string = """
+    div_pre_string = """
 def DIV(a, b):
     return a / b
 
 """
-        mod_pre_string = """
+    mod_pre_string = """
 def MOD(a, b):
     return a % b
 
 """
-        len_pre_string = """
+    len_pre_string = """
 def LENGTH(s):
     return len(s)
 
 """
-        lcase_pre_string = """
+    lcase_pre_string = """
 def LCASE(s):
     return s.lower()
 
 """
-        ucase_pre_string = """
+    ucase_pre_string = """
 def UCASE(s):
     return s.upper()
 
 """
-        roundpre_string = """
+    roundpre_string = """
 def ROUND(n, d):
     return round(n, d)
 
 """
-        substring_pre_string = """
+    substring_pre_string = """
 def SUBSTRING(s, start, length):
     return s[start:start+length]
 
 """
-        random_pre_string = """
+    random_pre_string = """
 import random
 
 def RANDOM():
     return random.random()
 """
-        self.pre_string_dic = {
-            "DIV": div_pre_string,
-            "MOD": mod_pre_string,
-            "LENGTH": len_pre_string,
-            "LCASE": lcase_pre_string,
-            "UCASE": ucase_pre_string,
-            "ROUND": roundpre_string,
-            "SUBSTRING": substring_pre_string,
-            "RANDOM": random_pre_string,
-        }
+    pre_string_dic = {
+        "DIV": div_pre_string,
+        "MOD": mod_pre_string,
+        "LENGTH": len_pre_string,
+        "LCASE": lcase_pre_string,
+        "UCASE": ucase_pre_string,
+        "ROUND": roundpre_string,
+        "SUBSTRING": substring_pre_string,
+        "RANDOM": random_pre_string,
+    }
+    default_values = {
+        "INTEGER": "int()",
+        "STRING": "str()",
+        "CHAR": "str()",
+        "BOOLEAN": "bool()",
+        "REAL": "float()",
+    }
+    data_type_conv = {
+        "INTEGER": "int",
+        "STRING": "str",
+        "CHAR": "str",
+        "BOOLEAN": "bool",
+        "REAL": "float",
+    }
+    operator_dic = {
+        "ADD": "+",
+        "SUB": "-",
+        "MUL": "*",
+        "DIW": "/",
+        "NEQ": "!=",
+        "GEQ": ">=",
+        "LEQ": "<=",
+        "GT": ">",
+        "LT": "<",
+        "EQ": "==",
+        "POW": "**",
+        "ASSIGN": "=",
+        "AND": "and",
+        "OR": "or",
+        "NOT": "not",
+    }
+
+    def __init__(self) -> None:
+        self.pre_string = ""
 
     def ast_to_python(self, ast: dict) -> str:
         """将语法树转换为Python代码"""
-        default_values = {
-            "INTEGER": "int()",
-            "STRING": "str()",
-            "CHAR": "str()",
-            "BOOLEAN": "bool()",
-            "REAL": "float()",
-        }
-        data_type_conv = {
-            "INTEGER": "int",
-            "STRING": "str",
-            "CHAR": "str",
-            "BOOLEAN": "bool",
-            "REAL": "float",
-        }
         ast_type = ast["type"]
         if ast_type == "Program":
 
             ####################
             code = "\n".join(self.ast_to_python(stmt) for stmt in ast["statements"])
             return self.pre_string + code
-        
+
         elif ast_type == "SimpleVariableDeclaration":
-            default_value = default_values[ast["data_type"]]
-            data_type = data_type_conv[ast["data_type"]]
+            default_value = self.default_values[ast["data_type"]]
+            data_type = self.data_type_conv[ast["data_type"]]
             return f"{ast['identifier']}: {data_type} = {default_value}"
 
         elif ast_type == "ArrayDeclaration":
-            default_value = default_values[ast["data_type"]]
+            default_value = self.default_values[ast["data_type"]]
             single = f"{default_value}"
             for i in ast["dimensions"]:
                 upper = f"{self.ast_to_python(i['upper'])}"
@@ -997,10 +1024,10 @@ def RANDOM():
             return f"{ast['identifier']} = {ast['value']}"
 
         elif ast_type == "Assignment":
-            target_code = self.ast_to_python(ast['target'])
-            value_code = self.ast_to_python(ast['value'])
-            if ast['target_type'] in data_type_conv:
-                value_code = f"{data_type_conv[ast['target_type']]}({value_code})"
+            target_code = self.ast_to_python(ast["target"])
+            value_code = self.ast_to_python(ast["value"])
+            if ast["target_type"] in self.data_type_conv:
+                value_code = f"{self.data_type_conv[ast['target_type']]}({value_code})"
             return f"{target_code} = {value_code}"
 
         elif ast_type == "Identifier":
@@ -1010,27 +1037,10 @@ def RANDOM():
             return repr(ast["value"])
 
         elif ast_type == "UnaryExpression":
-            return f"{ast['operator']} {self.ast_to_python(ast['operand'])}"
+            return f"{self.operator_dic[ast['operator']]}({self.ast_to_python(ast['operand'])})"
 
         elif ast_type == "BinaryExpression":
-            dic = {
-                "ADD": "+",
-                "SUB": "-",
-                "MUL": "*",
-                "DIW": "/",
-                "NEQ": "!=",
-                "GEQ": ">=",
-                "LEQ": "<=",
-                "GT": ">",
-                "LT": "<",
-                "EQ": "==",
-                "POW": "**",
-                "ASSIGN": "=",
-                "AND": "and",
-                "OR": "or",
-                "NOT": "not",
-            }
-            return f"{self.ast_to_python(ast['left'])} {dic[ast['operator']]} {self.ast_to_python(ast['right'])}"
+            return f"{self.ast_to_python(ast['left'])} {self.operator_dic[ast['operator']]} {self.ast_to_python(ast['right'])}"
 
         elif ast_type == "IfStatement":
             then_block = "\n".join(
@@ -1047,7 +1057,7 @@ def RANDOM():
         elif ast_type == "WhileLoop":
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
             return f"while {self.ast_to_python(ast['condition'])}:\n{indent(body)}"
-        
+
         elif ast_type == "RepeatLoop":
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
             return f"while True:\n{indent(body)}\n    if {self.ast_to_python(ast['condition'])}:\n        break"
@@ -1062,7 +1072,10 @@ def RANDOM():
             return f"{ast['name']}({args})"
 
         elif ast_type == "FunctionCall":
-            if ast["function"] in self.pre_string_dic and self.pre_string_dic[ast["function"]] not in self.pre_string:
+            if (
+                ast["function"] in self.pre_string_dic
+                and self.pre_string_dic[ast["function"]] not in self.pre_string
+            ):
                 self.pre_string += self.pre_string_dic[ast["function"]]
             args = ", ".join(self.ast_to_python(arg) for arg in ast["arguments"])
             return f"{ast['function']}({args})"
@@ -1071,8 +1084,10 @@ def RANDOM():
             return f"return {self.ast_to_python(ast['expression'])}"
 
         elif ast_type == "InputStatement":
-            return "\n".join(f'{self.ast_to_python(elem["identifier"])} = {data_type_conv[elem["identifier_type"]]}(input())' for elem in ast["elements"])
-            
+            return "\n".join(
+                f'{self.ast_to_python(elem["identifier"])} = {self.data_type_conv[elem["identifier_type"]]}(input())'
+                for elem in ast["elements"]
+            )
 
         elif ast_type == "OutputStatement":
             expressions = ", ".join(
@@ -1113,18 +1128,27 @@ def RANDOM():
             return f"{cases}{otherwise}"
 
         elif ast_type == "ProcedureDeclaration":
-            params = ", ".join(f"{param['identifier']}: {data_type_conv[param['data_type']]}" for param in ast["parameters"])
+            params = ", ".join(
+                f"{param['identifier']}: {self.data_type_conv[param['data_type']]}"
+                for param in ast["parameters"]
+            )
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
             return f"def {ast['name']}({params}):\n{indent(body)}"
 
         elif ast_type == "FunctionDeclaration":
-            params = ", ".join(f"{param['identifier']}: {data_type_conv[param['data_type']]}" for param in ast["parameters"])
+            params = ", ".join(
+                f"{param['identifier']}: {self.data_type_conv[param['data_type']]}"
+                for param in ast["parameters"]
+            )
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
             return f"def {ast['name']}({params}):\n{indent(body)}"
-        
+
         elif ast_type == "ExpressionStatement":
             return self.ast_to_python(ast["expression"])
-        
+
+        elif ast_type == "Parenthesis":
+            return f"({self.ast_to_python(ast['operand'])})"
+
         else:
             raise ValueError(f"Unknown AST node type: {ast['type']}")
 
@@ -1137,7 +1161,7 @@ def indent(code: str, level: int = 1) -> str:
 if __name__ == "__main__":
 
     def run_test(code):
-        tokens = tokenize(code)
+        tokens = Tokenizer(code).tokenize()
         ast = Parser(tokens).parse_program()
         print(json.dumps(ast, indent=2))
         python_code = Pseudocode().ast_to_python(ast)
