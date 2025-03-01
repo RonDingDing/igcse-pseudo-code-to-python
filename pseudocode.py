@@ -153,19 +153,19 @@ class Token:
 
 ############
 class Parser:
-    def __init__(self, tokens) -> None:
+    def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
         self.pos = 0
         self.current_token = self.tokens[0] if tokens else None
         self.scope_stack = [{}]  # 作用域栈，初始为全局作用域
 
-    def enter_scope(self):
+    def enter_scope(self) -> None:
         self.scope_stack.append({})
 
-    def exit_scope(self):
+    def exit_scope(self) -> None:
         self.scope_stack.pop()
 
-    def declare_identifier(self, name: str, data_type: str):
+    def declare_identifier(self, name: str, data_type: str) -> None:
         self.scope_stack[-1][name] = data_type
 
     def get_identifier_type(self, identifier: dict) -> str:
@@ -182,6 +182,11 @@ class Parser:
         return None
 
     def consume(self, token_type: Optional[str] = None) -> Optional[Token]:
+        if not self.current_token:
+            previous_token = self.tokens[self.pos-1]
+            raise SyntaxError(
+                f"Expected {token_type}, but there is no tokens {previous_token.line}:{previous_token.start}."
+            )
         if token_type and self.current_token and self.current_token.type != token_type:
             raise SyntaxError(
                 f"Expected {token_type}, got {self.current_token.type}, {self.current_token}"
@@ -988,8 +993,6 @@ def RANDOM():
         """将语法树转换为Python代码"""
         ast_type = ast["type"]
         if ast_type == "Program":
-
-            ####################
             code = "\n".join(self.ast_to_python(stmt) for stmt in ast["statements"])
             return self.pre_string + code
 
