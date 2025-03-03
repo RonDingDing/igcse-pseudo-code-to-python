@@ -50,6 +50,7 @@ class Tokenizer:
         (r"\<\>", "NEQ"),
         (r"\>\=", "GEQ"),
         (r"\<\=", "LEQ"),
+        (r"\<\-", "ASSIGN"),
         (r"\>", "GT"),
         (r"\<", "LT"),
         (r"\=", "EQ"),

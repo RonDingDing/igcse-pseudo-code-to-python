@@ -1,0 +1,6 @@
+DECLARE Counter : INTEGER
+DECLARE Apple: INTEGER
+Counter <- 4
+IF MOD(4, 2) = 0 THEN
+    OUTPUT TRUE
+ENDIF
