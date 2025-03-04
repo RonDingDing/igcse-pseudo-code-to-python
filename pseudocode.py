@@ -85,13 +85,12 @@ class Tokenizer:
         (r"\)", "RPAREN"),
         (r"\{", "LBRACE"),
         (r"\}", "RBRACE"),
-        (r"\d+(\.\d+)?", "NUMBER"),
         (r'"[^"]*"', "STRING"),
         (r"'[^']*'", "STRING"),
         (r"\b(INTEGER|STRING|CHAR|BOOLEAN|REAL)\b", "DATATYPE"),
-        (r"\bTRUE\b", "TRUE"),
-        (r"\bFALSE\b", "FALSE"),
-        (r"[a-zA-Z_][a-zA-Z0-9_]*", "IDENTIFIER"),  # 放在最后
+        (r"\bTRUE\b", "BOOLEAN"),
+        (r"\bFALSE\b", "BOOLEAN"),
+        (r"[a-zA-Z0-9_\.]+", "ALLIDENTIFIER"),  # 放在最后
     ]
 
     empty = [
@@ -140,7 +139,7 @@ class Tokenizer:
 
 class Token:
     def __init__(self, types: str, value: Any, line: int, start: int, end: int) -> None:
-        self.type = types
+        self._type = types
         self.value = value
         self.line = line
         self.start = start
@@ -150,6 +149,16 @@ class Token:
         if self.value == "\n":
             return f"Token({self.type}, \\n)"
         return f"Token({self.type}, {self.value}, {self.line}:{self.start}-{self.end})"
+
+    @property
+    def type(self) -> str:
+        if self._type == "ALLIDENTIFIER":
+            if re.match(r"^\d+(\.\d+)?$", self.value):
+                return "NUMBER"
+            elif re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", self.value):
+                return "VARIDENTIFIER"
+            return "FILEIDENTIFIER"
+        return self._type
 
 
 ############
@@ -184,10 +193,11 @@ class Parser:
 
     def consume(self, token_type: Optional[str] = None) -> Optional[Token]:
         if not self.current_token:
-            previous_token = self.tokens[self.pos-1]
+            previous_token = self.tokens[self.pos - 1]
             raise SyntaxError(
                 f"Expected {token_type}, but there is no tokens {previous_token.line}:{previous_token.start}."
             )
+
         if token_type and self.current_token and self.current_token.type != token_type:
             raise SyntaxError(
                 f"Expected {token_type}, got {self.current_token.type}, {self.current_token}"
@@ -217,54 +227,59 @@ class Parser:
 
         # 变量/常量声明
         result = {}
-        if token.type == "DECLARE":
+        token_type = token.type
+        if token_type == "DECLARE":
             result = self.parse_declaration()
 
-        elif token.type == "CONSTANT":
+        elif token_type == "CONSTANT":
             result = self.parse_constant()
 
         # 控制结构
-        elif token.type in ("IF", "WHILE", "REPEAT", "FOR"):
+        elif token_type in ("IF", "WHILE", "REPEAT", "FOR"):
             result = self.parse_control_structure()
 
         # 过程调用
-        elif token.type == "CALL":
+        elif token_type == "CALL":
             result = self.parse_call()
 
         # 打开文件语句
-        elif token.type == "OPENFILE":
+        elif token_type == "OPENFILE":
             result = self.parse_openfile()
 
+        # 读取文件语句
+        elif token_type == "READFILE":
+            result = self.parse_readfile()
+
         # 写入文件语句
-        elif token.type == "WRITEFILE":
+        elif token_type == "WRITEFILE":
             result = self.parse_writefile()
 
         # 关闭文件语句
-        elif token.type == "CLOSEFILE":
+        elif token_type == "CLOSEFILE":
             result = self.parse_closefile()
 
         # 输入语句
-        elif token.type == "INPUT":
+        elif token_type == "INPUT":
             result = self.parse_input()
 
         # 输出语句
-        elif token.type == "OUTPUT":
+        elif token_type == "OUTPUT":
             result = self.parse_output()
 
         # case 语句
-        elif token.type == "CASE":
+        elif token_type == "CASE":
             return self.parse_case()
 
         # 过程定义
-        elif token.type == "PROCEDURE":
+        elif token_type == "PROCEDURE":
             result = self.parse_procedure()
 
         # 函数定义
-        elif token.type == "FUNCTION":
+        elif token_type == "FUNCTION":
             result = self.parse_function()
 
         # 函数返回
-        elif token.type == "RETURN":
+        elif token_type == "RETURN":
             result = self.parse_return()
 
         # 其他语句（如表达式语句）
@@ -338,7 +353,7 @@ class Parser:
     def parse_closefile(self) -> dict:
         """CLOSEFILE <file_identifier>"""
         self.consume("CLOSEFILE")
-        file_id_token = self.consume("IDENTIFIER")
+        file_id_token = self.consume("FILEIDENTIFIER")
         if not file_id_token:
             raise SyntaxError("Expected file identifier after CLOSEFILE")
         file_id = file_id_token.value
@@ -347,7 +362,7 @@ class Parser:
     def parse_readfile(self) -> dict:
         """READFILE <file_identifier>, <variable>"""
         self.consume("READFILE")
-        file_id_token = self.consume("IDENTIFIER")
+        file_id_token = self.consume("FILEIDENTIFIER")
         if not file_id_token:
             raise SyntaxError("Expected file identifier after READFILE")
         file_id = file_id_token.value
@@ -358,7 +373,7 @@ class Parser:
     def parse_writefile(self) -> dict:
         """WRITEFILE <file_identifier>, <variable>"""
         self.consume("WRITEFILE")
-        file_id_token = self.consume("IDENTIFIER")
+        file_id_token = self.consume("FILEIDENTIFIER")
         if not file_id_token:
             raise SyntaxError("Expected file identifier after WRITEFILE")
         file_id = file_id_token.value
@@ -369,7 +384,7 @@ class Parser:
     def parse_openfile(self) -> dict:
         """OPENFILE <file_identifier> FOR <mode>"""
         self.consume("OPENFILE")
-        file_id_token = self.consume("IDENTIFIER")
+        file_id_token = self.consume("FILEIDENTIFIER")
         if not file_id_token:
             raise SyntaxError("Expected file identifier after OPENFILE")
         file_id = file_id_token.value
@@ -416,7 +431,7 @@ class Parser:
         self.consume(start_keyword)
 
         # 获取过程名称
-        name_token = self.consume("IDENTIFIER")
+        name_token = self.consume("VARIDENTIFIER")
         if not name_token:
             raise SyntaxError("Expected identifier in procedure declaration")
 
@@ -428,7 +443,7 @@ class Parser:
             self.consume("LPAREN")
             while self.current_token and self.current_token.type != "RPAREN":
                 # 解析单个参数 <param>:<datatype>
-                param_token = self.consume("IDENTIFIER")
+                param_token = self.consume("VARIDENTIFIER")
                 if not param_token:
                     raise SyntaxError("Expected identifier in procedure declaration")
                 param_name = param_token.value
@@ -474,7 +489,7 @@ class Parser:
         while True:
             if not self.current_token:
                 break
-            if self.current_token.type != "IDENTIFIER":
+            if self.current_token.type != "VARIDENTIFIER":
                 raise SyntaxError("Expected identifier after INPUT")
             identifier = self.parse_primary()
             identifier_type = self.get_identifier_type(identifier)
@@ -505,7 +520,7 @@ class Parser:
     def parse_declaration(self) -> dict:
         """Declaration ::= 'DECLARE' Identifier ':' DataType | ArrayDeclaration"""
         self.consume("DECLARE")
-        id_token = self.consume("IDENTIFIER")
+        id_token = self.consume("VARIDENTIFIER")
         if not id_token:
             raise SyntaxError("Expected identifier after DECLARE")
         identifier = id_token.value
@@ -658,7 +673,7 @@ class Parser:
             return {}
 
         # 标识符（可能带索引）
-        if token.type == "IDENTIFIER":
+        if token.type == "VARIDENTIFIER":
             # 处理数组索引 x[1, 2]
             if self.current_token and self.current_token.type == "LBRACKET":
                 indices = []
@@ -690,7 +705,7 @@ class Parser:
             return {"type": "Identifier", "name": token.value}
 
         # 字面量
-        elif token.type in ("NUMBER", "STRING"):
+        elif token.type in ("NUMBER", "STRING", "BOOLEAN"):
             return {"type": "Literal", "value": self.process_literal_value(token)}
 
         # 括号表达式
@@ -709,10 +724,6 @@ class Parser:
                     self.consume("COMMA")
             self.consume("RPAREN")
             return {"type": "FunctionCall", "function": token.type, "arguments": args}
-
-        # TRUE, FALSE
-        elif token.type in ("TRUE", "FALSE"):
-            return {"type": "Literal", "value": token.type == "TRUE"}
 
         elif token.type in Tokenizer.unary_operators_types:
             operand = self.parse_primary()
@@ -790,7 +801,7 @@ class Parser:
     def parse_for_loop(self) -> dict:
         """FOR...TO...STEP...NEXT结构"""
         self.consume("FOR")
-        var_name_token = self.consume("IDENTIFIER")
+        var_name_token = self.consume("VARIDENTIFIER")
         if not var_name_token:
             raise SyntaxError("Expected identifier after FOR")
         var_name = var_name_token.value
@@ -806,7 +817,7 @@ class Parser:
         while self.current_token and self.current_token.type != "NEXT":
             body.append(self.parse_statement())
         self.consume("NEXT")
-        id_token = self.consume("IDENTIFIER")  # 检查循环变量是否匹配
+        id_token = self.consume("VARIDENTIFIER")  # 检查循环变量是否匹配
         if not id_token:
             raise SyntaxError("Expected identifier after NEXT")
         if id_token.value != var_name:
@@ -824,7 +835,7 @@ class Parser:
     def parse_call(self) -> dict:
         """CALL语句解析"""
         self.consume("CALL")
-        id_token = self.consume("IDENTIFIER")
+        id_token = self.consume("VARIDENTIFIER")
         if not id_token:
             raise SyntaxError("Expected identifier")
         name = id_token.value
@@ -841,7 +852,7 @@ class Parser:
     def parse_constant(self) -> dict:
         """解析常量声明语句（符合IGCSE规范，值必须为字面量）"""
         self.consume("CONSTANT")
-        id_token = self.consume("IDENTIFIER")
+        id_token = self.consume("VARIDENTIFIER")
         if not id_token:
             raise SyntaxError("Expected identifier")
         identifier = id_token.value
@@ -876,7 +887,7 @@ class Parser:
     def parse_lvalue(self) -> dict:
         """解析可赋值目标（标识符或数组访问）"""
         # 基础标识符
-        id_token = self.consume("IDENTIFIER")
+        id_token = self.consume("VARIDENTIFIER")
         if not id_token:
             raise SyntaxError("Expected identifier")
         identifier = id_token.value
@@ -1025,7 +1036,7 @@ def RANDOM():
             return f"{ast['identifier']}: list = {single}"
 
         elif ast_type == "ConstantDeclaration":
-            return f"{ast['identifier']} = {ast['value']}"
+            return f"{ast['identifier']} = {repr(ast['value'])}"
 
         elif ast_type == "Assignment":
             target_code = self.ast_to_python(ast["target"])
@@ -1106,16 +1117,16 @@ def RANDOM():
             return f"{ast['array']}{indices}"
 
         elif ast_type == "OpenFile":
-            return f"{ast['file']} = open({ast['file']}, '{ast['mode'].lower()}')"
+            return f"with open(\"{ast['file']}\", '{ast['mode'][0].lower()}') as __fp:\n    pass"
 
         elif ast_type == "CloseFile":
-            return f"{ast['file']}.close()"
+            return f""
 
         elif ast_type == "ReadFile":
-            return f"{ast['target']} = {ast['file']}.read()"
+            return f"with open(\"{ast['file']}\", 'r') as __fp:\n    {ast['target']['name']} = __fp.read()"
 
         elif ast_type == "WriteFile":
-            return f"{ast['file']}.write({ast['target']})"
+            return f"with open(\"{ast['file']}\", 'w') as __fp:\n    __fp.write({ast['target']['name']})"
 
         elif ast_type == "CaseStatement":
             cases = f"__case = {self.ast_to_python(ast['expression'])}\n"
@@ -1123,9 +1134,13 @@ def RANDOM():
                 if_key = "elif"
                 if i == 0:
                     if_key = "if"
-                segment = f"{if_key} __case == {self.ast_to_python(case['condition'])}:\n{indent(self.ast_to_python(case['body']))}\n"
+                segment = (
+                    f"{if_key} __case == {self.ast_to_python(case['condition'])}:\n"
+                )
+                segment += f"{indent(self.ast_to_python(case['body']))}\n"
                 cases += segment
-            if ast["otherwise"]:
+            otherwise = ""
+            if ast.get("otherwise"):
                 otherwise = f"else:\n"
                 for ot in ast["otherwise"]:
                     otherwise += f"{indent(self.ast_to_python(ot))}"
@@ -1171,13 +1186,12 @@ if __name__ == "__main__":
         python_code = Pseudocode().ast_to_python(ast)
         return python_code
 
-    import os
+    import sys
 
-    for f in os.listdir("tests"):
-        if f.endswith(".txt"):
-            with open("tests/" + f, "r", encoding="utf8") as file:
-                print(f"--- {f} ---")
-                code = run_test(file.read())
-                with open(f + ".py", "w", encoding="utf-8") as fp:
-                    fp.write(code)
-                print()
+    f = sys.argv[1]
+    with open(f, "r", encoding="utf8") as file:
+        print(f"--- {f} ---")
+        code = run_test(file.read())
+        with open(f + ".py", "w", encoding="utf-8") as fp:
+            fp.write(code)
+        print()
