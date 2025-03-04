@@ -1,6 +1,6 @@
 // 处理成绩并写入文件
-PROCEDURE ProcessGrades(FileName : STRING)
-    OPENFILE FileName FOR WRITE
+PROCEDURE ProcessGrades()
+    OPENFILE 1.txt FOR WRITE
     DECLARE Grade : CHAR
     
     FOR Index ← 1 TO 5
@@ -21,8 +21,8 @@ PROCEDURE ProcessGrades(FileName : STRING)
         // 嵌套字符串操作
         DECLARE OutputLine : STRING
         OutputLine ← SUBSTRING(StudentNames[Index], 1, 3) + ": " + StudentScores[Index] + " (" + Grade + ")"
-        WRITEFILE FileName, OutputLine
+        WRITEFILE 1.txt, OutputLine
     NEXT Index
     
-    CLOSEFILE FileName
+    CLOSEFILE 1.txt
 ENDPROCEDURE

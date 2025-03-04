@@ -1,0 +1,59 @@
+DECLARE GreetingComponents : ARRAY[0:5] OF STRING
+DECLARE FinalMessage : STRING
+CONSTANT BaseMessage ← "Happy "
+DECLARE TempStr : STRING
+DECLARE FileContent : STRING
+
+GreetingComponents[1] ← "International"
+GreetingComponents[2] ← "Working"
+GreetingComponents[3] ← SUBSTRING("Women's Empowerment", 1, 7) // Extracts "Women's"
+GreetingComponents[4] ← "Day"
+
+OPENFILE config.txt FOR WRITE
+WRITEFILE config.txt, FileContent
+CLOSEFILE config.txt
+
+OPENFILE config.txt FOR READ
+READFILE config.txt, FileContent
+CLOSEFILE config.txt
+
+IF LENGTH(FileContent) > 0 THEN
+    GreetingComponents[2] ← UCASE(SUBSTRING(FileContent, 1, 7)) 
+ENDIF
+
+PROCEDURE BuildMessage
+    FinalMessage ← BaseMessage
+    FOR Index ← 1 TO 4
+        IF GreetingComponents[Index] = "Women's" THEN
+            TempStr ← LCASE(GreetingComponents[Index])
+            TempStr ← UCASE(SUBSTRING(TempStr, 1, 1)) + SUBSTRING(TempStr, 2, 3)
+        ELSE
+            TempStr ← GreetingComponents[Index]
+        ENDIF
+        
+        FinalMessage ← FinalMessage + TempStr
+        IF Index < 4 THEN
+            FinalMessage ← FinalMessage + " "
+        ENDIF
+    NEXT Index
+ENDPROCEDURE
+
+DECLARE ValidationNumber : INTEGER
+ValidationNumber ← (MOD(LENGTH(FinalMessage),  10)) + DIV(2023, 1000)
+
+
+CASE OF ValidationNumber
+    2: 
+        CALL BuildMessage
+        
+    5: 
+        OUTPUT "System Error: Validation failed"
+    OTHERWISE
+        WHILE ValidationNumber <> 0 DO
+            ValidationNumber ← 0
+        ENDWHILE
+        
+ENDCASE
+
+CALL BuildMessage
+OUTPUT FinalMessage, "Happy International Working Women's Day!"

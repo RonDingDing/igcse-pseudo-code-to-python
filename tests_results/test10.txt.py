@@ -1,33 +1,14 @@
 
-import random
-def DIV(a, b):
-    return a // b
-
 def MOD(a, b):
     return a % b
 
-def LENGTH(s):
-    return len(s)
-
-def LCASE(s):
-    return s.lower()
-
-def UCASE(s):
-    return s.upper()
 
 def SUBSTRING(s, start, length):
     return s[start:start+length]
 
-def ROUND(n, d):
-    return round(n, d)
-
-def RANDOM():
-    return random.random()
-
-####################
-
-def ProcessGrades(FileName):
-    FileName = open(FileName, 'write')
+def ProcessGrades():
+    with open("1.txt", 'w') as __fp:
+        pass
     Grade: str = str()
     for Index in range(1, 5):
         if StudentScores[Index] >= PassMark:
@@ -45,5 +26,6 @@ def ProcessGrades(FileName):
             Grade = 'F'
         OutputLine: str = str()
         OutputLine = SUBSTRING(StudentNames[Index], 1, 3) + ': ' + StudentScores[Index] + ' (' + Grade + ')'
-        FileName.write({'type': 'Identifier', 'name': 'OutputLine'})
-    FileName.close()
+        with open("1.txt", 'w') as __fp:
+            __fp.write(OutputLine)
+    
