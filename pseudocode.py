@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 import json
-from typing import Optional, Any, Sequence
+from typing import Optional, Any
 
 
 class Tokenizer:
@@ -926,6 +926,7 @@ def MOD(a: int, b: int) -> int:
 
 """
     len_pre_string = """
+from typing import Sequence
 def LENGTH(s: Sequence) -> int:
     return len(s)
 
