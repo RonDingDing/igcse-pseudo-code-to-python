@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 import json
-from typing import Optional, Any
+from typing import Optional, Any, Sequence
 
 
 class Tokenizer:
@@ -916,37 +916,37 @@ class Parser:
 class Pseudocode:
 
     div_pre_string = """
-def DIV(a, b):
-    return a / b
+def DIV(a: int, b: int) -> int:
+    return a // b
 
 """
     mod_pre_string = """
-def MOD(a, b):
+def MOD(a: int, b: int) -> int:
     return a % b
 
 """
     len_pre_string = """
-def LENGTH(s):
+def LENGTH(s: Sequence) -> int:
     return len(s)
 
 """
     lcase_pre_string = """
-def LCASE(s):
+def LCASE(s: str) -> str:
     return s.lower()
 
 """
     ucase_pre_string = """
-def UCASE(s):
+def UCASE(s: str) -> str:
     return s.upper()
 
 """
     roundpre_string = """
-def ROUND(n, d):
+def ROUND(n: float, d: int) -> float:
     return round(n, d)
 
 """
     substring_pre_string = """
-def SUBSTRING(s, start, length):
+def SUBSTRING(s: str, start: int, length: int) -> str:
     return s[start:start+length]
 
 """
@@ -1152,7 +1152,7 @@ def RANDOM():
                 for param in ast["parameters"]
             )
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
-            return f"def {ast['name']}({params}):\n{indent(body)}"
+            return f"def {ast['name']}({params}) -> None:\n{indent(body)}"
 
         elif ast_type == "FunctionDeclaration":
             params = ", ".join(
@@ -1160,7 +1160,12 @@ def RANDOM():
                 for param in ast["parameters"]
             )
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
-            return f"def {ast['name']}({params}):\n{indent(body)}"
+            return_type = (
+                "list"
+                if ast["return_type"]["is_array"]
+                else self.data_type_conv[ast["return_type"]["data_type"]]
+            )
+            return f"def {ast['name']}({params}) -> {return_type}:\n{indent(body)}"
 
         elif ast_type == "ExpressionStatement":
             return self.ast_to_python(ast["expression"])
@@ -1188,7 +1193,8 @@ if __name__ == "__main__":
 
     import sys
 
-    f = sys.argv[1]
+    # f = sys.argv[1]
+    f = "C:/Users/Ron/Desktop/Teaching/L2/编程题答案/15.txt"
     with open(f, "r", encoding="utf8") as file:
         print(f"--- {f} ---")
         code = run_test(file.read())
