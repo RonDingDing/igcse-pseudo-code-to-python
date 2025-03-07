@@ -1194,8 +1194,7 @@ if __name__ == "__main__":
 
     import sys
 
-    # f = sys.argv[1]
-    f = "C:/Users/Ron/Desktop/Teaching/L2/编程题答案/15.txt"
+    f = sys.argv[1]
     with open(f, "r", encoding="utf8") as file:
         print(f"--- {f} ---")
         code = run_test(file.read())
