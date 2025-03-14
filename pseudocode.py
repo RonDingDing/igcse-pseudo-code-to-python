@@ -184,6 +184,10 @@ class Parser:
             for scope in reversed(self.scope_stack):
                 if identifier["name"] in scope:
                     return scope[identifier["name"]]
+        elif identifier['type'] == 'ArrayAccess':
+            for scope in reversed(self.scope_stack):
+                if identifier["array"] in scope:
+                    return (scope[identifier["array"]]).split()[-1]
         return "UNKNOWN"
 
     def peek(self, lookahead: int = 0) -> Optional[Token]:
@@ -486,19 +490,15 @@ class Parser:
         self.consume("INPUT")
         elements = []
         # 必须包含至少一个变量
-        while True:
-            if not self.current_token:
-                break
-            if self.current_token.type != "VARIDENTIFIER":
-                raise SyntaxError("Expected identifier after INPUT")
-            identifier = self.parse_primary()
-            identifier_type = self.get_identifier_type(identifier)
-            elements.append(
-                {"identifier": identifier, "identifier_type": identifier_type}
-            )
-            if self.current_token.type != "COMMA":
-                break
-            self.consume("COMMA")
+        if not self.current_token:
+            raise SyntaxError("Expected a token!")
+        if self.current_token.type != "VARIDENTIFIER":
+            raise SyntaxError("Expected identifier after INPUT")
+        identifier = self.parse_primary()
+        identifier_type = self.get_identifier_type(identifier)
+        elements.append(
+            {"identifier": identifier, "identifier_type": identifier_type}
+        )
         return {"type": "InputStatement", "elements": elements}
 
     def parse_output(self) -> dict:
