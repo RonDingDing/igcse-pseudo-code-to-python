@@ -184,7 +184,7 @@ class Parser:
             for scope in reversed(self.scope_stack):
                 if identifier["name"] in scope:
                     return scope[identifier["name"]]
-        elif identifier['type'] == 'ArrayAccess':
+        elif identifier["type"] == "ArrayAccess":
             for scope in reversed(self.scope_stack):
                 if identifier["array"] in scope:
                     return (scope[identifier["array"]]).split()[-1]
@@ -496,9 +496,7 @@ class Parser:
             raise SyntaxError("Expected identifier after INPUT")
         identifier = self.parse_primary()
         identifier_type = self.get_identifier_type(identifier)
-        elements.append(
-            {"identifier": identifier, "identifier_type": identifier_type}
-        )
+        elements.append({"identifier": identifier, "identifier_type": identifier_type})
         return {"type": "InputStatement", "elements": elements}
 
     def parse_output(self) -> dict:
@@ -1149,7 +1147,7 @@ def RANDOM():
 
         elif ast_type == "ProcedureDeclaration":
             params = ", ".join(
-                f"{param['identifier']}: {self.data_type_conv[param['data_type']]}"
+                f"{param['identifier']}: {'list' if param['is_array'] else self.data_type_conv[param['data_type']]}"
                 for param in ast["parameters"]
             )
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
@@ -1157,7 +1155,7 @@ def RANDOM():
 
         elif ast_type == "FunctionDeclaration":
             params = ", ".join(
-                f"{param['identifier']}: {self.data_type_conv[param['data_type']]}"
+                f"{param['identifier']}: {'list' if param['is_array'] else self.data_type_conv[param['data_type']]}"
                 for param in ast["parameters"]
             )
             body = "\n".join(self.ast_to_python(stmt) for stmt in ast["body"])
