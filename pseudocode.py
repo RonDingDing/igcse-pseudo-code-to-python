@@ -407,6 +407,29 @@ class Parser:
     def parse_function(self) -> dict:
         return self.parse_procedure_or_function("FUNCTION")
 
+    def parse_function_procedure_call(self, typi: str, name: str) -> dict:
+        params = []
+        while self.current_token and self.current_token.type != "RPAREN":
+            params.append(self.parse_expression())
+            if self.current_token.type == "COMMA":
+                self.consume("COMMA")
+        self.consume("RPAREN")
+        return {
+            "type": typi,
+            "function": name,
+            "arguments": params,
+        }
+
+    def parse_indexing(self, arr_name: str) -> dict:
+        indices = []
+        indices.append(self.parse_expression())
+        while self.current_token and self.current_token.type == "COMMA":
+            self.consume("COMMA")
+            indices.append(self.parse_expression())
+        self.consume("RBRACKET")
+
+        return {"type": "ArrayAccess", "array": arr_name, "indices": indices}
+
     def parse_procedure_or_function(self, typin: str) -> dict:
         """解析过程定义
         PROCEDURE <identifier>
@@ -674,30 +697,13 @@ class Parser:
         if token.type == "VARIDENTIFIER":
             # 处理数组索引 x[1, 2]
             if self.current_token and self.current_token.type == "LBRACKET":
-                indices = []
                 self.consume("LBRACKET")
-                indices.append(self.parse_expression())
-                while self.current_token.type == "COMMA":
-                    self.consume("COMMA")
-                    indices.append(self.parse_expression())
-                self.consume("RBRACKET")
-
-                return {"type": "ArrayAccess", "array": token.value, "indices": indices}
+                return self.parse_indexing(token.value)
 
             # 函数调用
             elif self.current_token and self.current_token.type == "LPAREN":
-                params = []
                 self.consume("LPAREN")
-                while self.current_token and self.current_token.type != "RPAREN":
-                    params.append(self.parse_expression())
-                    if self.current_token.type == "COMMA":
-                        self.consume("COMMA")
-                self.consume("RPAREN")
-                return {
-                    "type": "FunctionCall",
-                    "function": token.value,
-                    "arguments": params,
-                }
+                return self.parse_function_procedure_call("FunctionCall", token.value)
 
             # 普通标识符
             return {"type": "Identifier", "name": token.value}
@@ -706,22 +712,18 @@ class Parser:
         elif token.type in ("NUMBER", "STRING", "BOOLEAN"):
             return {"type": "Literal", "value": self.process_literal_value(token)}
 
-        # 括号表达式
+        # 多层函数调用 IDENTIFIER(IDENTIFIER...)(IDENTIFIER...)
         elif token.type == "LPAREN":
-            expr = self.parse_expression()
-            self.consume("RPAREN")
-            return {"type": "Parenthesis", "operand": expr}
-
-        # 函数调用
+            return self.parse_function_procedure_call("FunctionCall", "-")
+        
+        # 复杂索引 IDENTIFIER(IDENTIFIER...)[IDENTIFIER...]
+        elif token.type == "LBRACKET":
+            return self.parse_indexing("-")
+        
+        # 默认函数调用
         elif token.type in [f[1] for f in Tokenizer.functions]:
             self.consume("LPAREN")
-            args = []
-            while self.current_token and self.current_token.type != "RPAREN":
-                args.append(self.parse_expression())
-                if self.current_token.type == "COMMA":
-                    self.consume("COMMA")
-            self.consume("RPAREN")
-            return {"type": "FunctionCall", "function": token.type, "arguments": args}
+            return self.parse_function_procedure_call("FunctionCall", token.type)
 
         elif token.type in Tokenizer.unary_operators_types:
             operand = self.parse_primary()
@@ -837,15 +839,10 @@ class Parser:
         if not id_token:
             raise SyntaxError("Expected identifier")
         name = id_token.value
-        args = []
         if self.current_token and self.current_token.type == "LPAREN":
             self.consume("LPAREN")
-            while self.current_token and self.current_token.type != "RPAREN":
-                args.append(self.parse_expression())
-                if self.current_token and self.current_token.type == "COMMA":
-                    self.consume("COMMA")
-            self.consume("RPAREN")
-        return {"type": "ProcedureCall", "name": name, "arguments": args}
+            return self.parse_function_procedure_call("ProcedureCall", name)
+        return {"type": "ProcedureCall", "function": name, "arguments": []}
 
     def parse_constant(self) -> dict:
         """解析常量声明语句（符合IGCSE规范，值必须为字面量）"""
@@ -881,35 +878,6 @@ class Parser:
         elif token.type == "STRING":
             return token.value[1:-1]  # Remove quotes
         return token.value  # STRING类型直接返回
-
-    def parse_lvalue(self) -> dict:
-        """解析可赋值目标（标识符或数组访问）"""
-        # 基础标识符
-        id_token = self.consume("VARIDENTIFIER")
-        if not id_token:
-            raise SyntaxError("Expected identifier")
-        identifier = id_token.value
-        indices = []
-
-        # 处理多维数组访问
-        while self.current_token and self.current_token.type == "LBRACKET":
-            self.consume("LBRACKET")
-            # 解析索引表达式列表（支持逗号分隔）
-            index_group = []
-            while True:
-                index_group.append(self.parse_expression())
-                if self.current_token.type == "COMMA":
-                    self.consume("COMMA")
-                else:
-                    break
-            self.consume("RBRACKET")
-            indices.append(index_group)
-
-        # 构建数据结构
-        if indices:
-            return {"type": "ArrayAccess", "array": identifier, "indices": indices}
-        return {"type": "Identifier", "name": identifier}
-
 
 class Pseudocode:
 
@@ -1083,7 +1051,7 @@ def RANDOM():
 
         elif ast_type == "ProcedureCall":
             args = ", ".join(self.ast_to_python(arg) for arg in ast["arguments"])
-            return f"{ast['name']}({args})"
+            return f"{ast['function']}({args})"
 
         elif ast_type == "FunctionCall":
             if (

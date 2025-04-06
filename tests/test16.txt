@@ -8,3 +8,6 @@ FUNCTION good(arr: ARRAY[0: 3] OF INTEGER) RETURNS ARRAY[0: 3] OF INTEGER
     RETURN arr
 ENDFUNCTION
 
+DIV(2, 1)
+good(arr)()
+good(arr)[0]
