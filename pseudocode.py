@@ -714,11 +714,15 @@ class Parser:
 
         # 多层函数调用 IDENTIFIER(IDENTIFIER...)(IDENTIFIER...)
         elif token.type == "LPAREN":
-            return self.parse_function_procedure_call("FunctionCall", "-")
+            tree = self.parse_function_procedure_call("FunctionCall", "-")
+            tree["start"] = "backslash"
+            return tree
         
         # 复杂索引 IDENTIFIER(IDENTIFIER...)[IDENTIFIER...]
         elif token.type == "LBRACKET":
-            return self.parse_indexing("-")
+            tree = self.parse_indexing("-")
+            tree["start"] = "backslash"
+            return tree
         
         # 默认函数调用
         elif token.type in [f[1] for f in Tokenizer.functions]:
@@ -972,7 +976,13 @@ def RANDOM():
         """将语法树转换为Python代码"""
         ast_type = ast["type"]
         if ast_type == "Program":
-            code = "\n".join(self.ast_to_python(stmt) for stmt in ast["statements"])
+            code = ""
+            for stmt in ast["statements"]:
+                if stmt.get("expression", {}).get("start", "") == "backslash":
+                    code = code.rstrip('\n')
+                else:
+                    code += "\n"
+                code += self.ast_to_python(stmt)
             return self.pre_string + code
 
         elif ast_type == "SimpleVariableDeclaration":
@@ -1060,7 +1070,7 @@ def RANDOM():
             ):
                 self.pre_string += self.pre_string_dic[ast["function"]]
             args = ", ".join(self.ast_to_python(arg) for arg in ast["arguments"])
-            return f"{ast['function']}({args})"
+            return f"{ast['function'] if ast['function'] != '-' else ''}({args})"
 
         elif ast_type == "ReturnStatement":
             return f"return {self.ast_to_python(ast['expression'])}"
@@ -1081,7 +1091,7 @@ def RANDOM():
             indices = "".join(
                 f"[{self.ast_to_python(index)}]" for index in ast["indices"]
             )
-            return f"{ast['array']}{indices}"
+            return f"{ast['array'] if ast['array'] != '-' else ''}{indices}"
 
         elif ast_type == "OpenFile":
             return f"with open(\"{ast['file']}\", '{ast['mode'][0].lower()}') as __fp:\n    pass"
@@ -1160,7 +1170,7 @@ if __name__ == "__main__":
 
     import sys
 
-    f = sys.argv[1]
+    f = "tests/test16.txt" if len(sys.argv) < 2 else  sys.argv[1]
     with open(f, "r", encoding="utf8") as file:
         print(f"--- {f} ---")
         code = run_test(file.read())

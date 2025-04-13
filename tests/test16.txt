@@ -9,5 +9,5 @@ FUNCTION good(arr: ARRAY[0: 3] OF INTEGER) RETURNS ARRAY[0: 3] OF INTEGER
 ENDFUNCTION
 
 DIV(2, 1)
-good(arr)()
-good(arr)[0]
+good(Arr)()
+good(Arr)[0]
